@@ -162,6 +162,60 @@
       z-index: 0;
     }
 
+    .marquee {
+      position: absolute;
+      left: 0;
+      right: 0;
+      z-index: 5;
+      pointer-events: none;
+      overflow: hidden;
+      opacity: 0.92;
+    }
+
+    .marquee.top {
+      top: 18px;
+    }
+
+    .marquee.bottom {
+      bottom: 18px;
+    }
+
+    .marquee-track {
+      display: flex;
+      width: max-content;
+      gap: 26px;
+      animation: marqueeLeft 18s linear infinite;
+    }
+
+    .marquee.bottom .marquee-track {
+      animation-name: marqueeRight;
+      animation-duration: 20s;
+    }
+
+    .marquee-text {
+      flex: 0 0 auto;
+      font-family: "Courier New", "Lucida Console", monospace;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: 0.18em;
+      color: rgba(255, 241, 247, 0.88);
+      text-transform: uppercase;
+      text-shadow:
+        0 0 0 rgba(255, 255, 255, 0.8),
+        1px 0 0 rgba(255, 205, 232, 0.48),
+        0 1px 0 rgba(255, 205, 232, 0.48);
+      white-space: nowrap;
+    }
+
+    .marquee {
+      transition: opacity 320ms ease, transform 420ms ease;
+    }
+
+    main.is-opening .marquee-track {
+      animation-play-state: paused;
+    }
+
     .seal {
       position: absolute;
       left: 50%;
@@ -406,6 +460,17 @@
       pointer-events: none;
     }
 
+    main.is-launching .marquee,
+    main.is-open .marquee {
+      opacity: 0;
+      transform: translateY(-8px);
+      transition-delay: 0.2s;
+    }
+
+    main.is-open .marquee.bottom {
+      transform: translateY(8px);
+    }
+
     main.is-open .cover {
       opacity: 0;
       transform: translate(-50%, -76%) scale(0.34) rotate(-13deg);
@@ -457,10 +522,42 @@
         transform: translate3d(-3%, 2%, 0) rotate(8deg);
       }
     }
+
+    @keyframes marqueeLeft {
+      from {
+        transform: translateX(0);
+      }
+      to {
+        transform: translateX(-50%);
+      }
+    }
+
+    @keyframes marqueeRight {
+      from {
+        transform: translateX(-50%);
+      }
+      to {
+        transform: translateX(0);
+      }
+    }
   </style>
 </head>
 <body>
   <main id="experience" aria-label="新年贺卡体验">
+    <div class="marquee top" aria-hidden="true">
+      <div class="marquee-track">
+        <span class="marquee-text">HAPPY NEW YEAR HAPPY NEW YEAR HAPPY NEW YEAR</span>
+        <span class="marquee-text">HAPPY NEW YEAR HAPPY NEW YEAR HAPPY NEW YEAR</span>
+      </div>
+    </div>
+
+    <div class="marquee bottom" aria-hidden="true">
+      <div class="marquee-track">
+        <span class="marquee-text">HAPPY NEW YEAR HAPPY NEW YEAR HAPPY NEW YEAR</span>
+        <span class="marquee-text">HAPPY NEW YEAR HAPPY NEW YEAR HAPPY NEW YEAR</span>
+      </div>
+    </div>
+
     <section class="stage" id="stage" aria-hidden="true">
       <canvas id="fireworks"></canvas>
       <div class="audio-controls" aria-label="音乐控制">
@@ -503,6 +600,7 @@
     const muteIcon = document.getElementById("mute-icon");
     const ctx = canvas.getContext("2d");
     const particles = [];
+    const ripples = [];
     const palette = ["#FFFFFF", "#FFF066", "#A0E0FF", "#FFB3D9"];
     const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -563,9 +661,9 @@
 
     function setStickPoints() {
       stickTop.x = contentLeft + contentWidth * 0.55;
-      stickTop.y = height * 0.31;
+      stickTop.y = height * 0.37;
       stickBottom.x = contentLeft + contentWidth * 0.35;
-      stickBottom.y = height * 1.16;
+      stickBottom.y = height * 1.01;
     }
 
     function drawGradientBackground() {
@@ -706,6 +804,27 @@
       return particle;
     }
 
+    function createRipple(x, y) {
+      ripples.push({
+        x,
+        y,
+        radius: 0,
+        maxRadius: randomRange(68, 122),
+        alpha: randomRange(0.26, 0.46),
+        lineWidth: randomRange(1.8, 3.1),
+        growth: randomRange(3.4, 5.8)
+      });
+    }
+
+    function createInteractiveBurst(x, y) {
+      createRipple(x, y);
+      createRipple(x + randomRange(-18, 18), y + randomRange(-12, 12));
+
+      for (let i = 0; i < 24; i++) {
+        particles.push(createParticle(x, y, true));
+      }
+    }
+
     function updateParticle(particle) {
       particle.vx *= 0.94;
       particle.vy *= 0.94;
@@ -800,6 +919,33 @@
       ctx.fill();
     }
 
+    function updateAndDrawRipples() {
+      for (let i = ripples.length - 1; i >= 0; i -= 1) {
+        const ripple = ripples[i];
+        ripple.radius += ripple.growth;
+        ripple.alpha *= 0.965;
+
+        ctx.save();
+        ctx.globalCompositeOperation = "screen";
+        ctx.strokeStyle = "rgba(255, 246, 252," + ripple.alpha + ")";
+        ctx.lineWidth = ripple.lineWidth;
+        ctx.beginPath();
+        ctx.arc(ripple.x, ripple.y, ripple.radius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = "rgba(255, 214, 236," + ripple.alpha * 0.68 + ")";
+        ctx.lineWidth = ripple.lineWidth * 0.72;
+        ctx.beginPath();
+        ctx.arc(ripple.x, ripple.y, ripple.radius * 0.72, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+
+        if (ripple.radius >= ripple.maxRadius || ripple.alpha < 0.02) {
+          ripples.splice(i, 1);
+        }
+      }
+    }
+
     function render() {
       frame += 1;
       drawGradientBackground();
@@ -825,6 +971,7 @@
         }
       }
 
+      updateAndDrawRipples();
       drawBurnCore();
       animationId = requestAnimationFrame(render);
     }
@@ -919,6 +1066,14 @@
 
     muteButton.addEventListener("click", () => {
       toggleMute();
+    });
+
+    canvas.addEventListener("click", (event) => {
+      if (!opened) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      createInteractiveBurst(x, y);
     });
 
     window.addEventListener("resize", () => {
